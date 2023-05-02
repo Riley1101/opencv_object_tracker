@@ -12,14 +12,25 @@ import numpy as np
 PORT = 7890
 print("Server listening on Port " + str(PORT))
 
+
+async def stream_untracked_frame(socket_client):
+    tracker = cv2.TrackerKCF_create()
+    video = cv2.VideoCapture(0)
+    if not video.isOpened():
+        print("INFO : Cannot open camera")
+        exit()
+    while True:
+        ok, frame = video.read()
+        img_str = base64.b64encode(cv2.imencode('.jpg', frame)[1]).decode()
+        await socket_client.send(img_str)
+
+
 async def stream(socket_client):
     tracker = cv2.TrackerKCF_create()
-    video = cv2.VideoCapture("video.mp4")
     if not video.isOpened():
         print("INFO : Cannot open camera")
         exit()
     ok, frame = video.read()
-# select frame from video
     bbox = cv2.selectROI(frame)
     ok = tracker.init(frame, bbox)
     while True:
@@ -34,27 +45,22 @@ async def stream(socket_client):
             cv2.putText(frame, 'Error', (100, 0),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
         img_str = base64.b64encode(cv2.imencode('.jpg', frame)[1]).decode()
-        await socket_client.send(img_str);
+        await socket_client.send(img_str)
 
 # A set of connected ws clients
 connected = set()
 
-# The main behavior function for this server
 async def echo(websocket, path):
     print("A client just connected")
+    streaming = False
     # Add the client to the set of connected clients
     connected.add(websocket)
-    while True:
-        await websocket.send("Welcome to the server!")
-        await stream(websocket)
+    # while True:
+    # await stream(websocket)
     try:
         async for message in websocket:
-            print("Received message from client: " + message)
-            # Send a response to all connected clients except sender
-            for conn in connected:
-                if conn != websocket:
-                    await conn.send("Someone said: " + message)
-    # Handle disconnecting clients 
+            if(message == "connect"):
+                await stream_untracked_frame(websocket)
     except websockets.exceptions.ConnectionClosed as e:
         print("A client just disconnected")
     finally:

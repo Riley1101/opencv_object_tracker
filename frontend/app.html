@@ -1,0 +1,121 @@
+<html>
+  <head>
+    <title>Open cv image string</title>
+    <link rel="stylesheet" href="./app.css" />
+    <script src="https://unpkg.com/konva@9/konva.min.js"></script>
+  </head>
+  <body>
+    <div class="app">
+      <div class="container" id="container"></div>
+      <nav class="nav">
+        <button type="" id="connect">Connect</button>
+        <button type="" id="button">Send</button>
+        <button type="" id="mode">Draw</button>
+      </nav>
+    </div>
+  </body>
+
+  <script>
+    let connect = document.querySelector("#connect");
+    let btn = document.querySelector("#button");
+    let container = document.querySelector("#container");
+    let editMode = false;
+    let socket = new WebSocket("ws://localhost:7890");
+    let draw = document.querySelector("#mode");
+    let targetPosition = null;
+
+    const stage = new Konva.Stage({
+      container: "container",
+      width: container.clientWidth,
+      height: container.clientHeight,
+    });
+    const layer = new Konva.Layer();
+    draw.addEventListener("click", toggleMode);
+    btn.addEventListener("click", sendCoordinates);
+    connect.addEventListener("click", connectToFeed);
+
+    function connectToFeed() {
+      socket.send("connect");
+    }
+
+    function sendCoordinates() {
+      if (targetPosition) {
+        socket.send(JSON.stringify(targetPosition));
+      }
+    }
+
+    function addRectangle(event) {
+      let position = stage.getPointerPosition();
+      const rect = new Konva.Rect({
+        x: position.x,
+        y: position.y,
+        width: 100,
+        height: 100,
+        fill: "transparent",
+        stroke: "black",
+        strokeWidth: 2,
+        draggable: true,
+      });
+      let newTarget = {
+        x: position.x,
+        y: position.y,
+        w: 100,
+        h: 100,
+      };
+      targetPosition = newTarget;
+      // check if stage has no children
+      if (stage.children.length === 0) {
+        layer.add(rect);
+        stage.add(layer);
+      }
+    }
+    stage.on("click", function (e) {
+      console.log(stage);
+      if (editMode) {
+        addRectangle(e);
+      }
+    });
+    function toggleMode() {
+      editMode = !editMode;
+      if (editMode) {
+        draw.innerHTML = "Stop";
+      } else {
+        draw.innerHTML = "Draw";
+      }
+    }
+    socket.onopen = function (e) {
+      console.log("[open] Connection established");
+      console.log("Sending to server");
+    };
+
+    let imageObj = new Image();
+    socket.onmessage = function (event) {
+      let imageData = "data:image/jpg;base64," + event.data;
+      imageObj.src = imageData;
+      imageObj.onload = function () {
+        let image = new Konva.Image({
+          x: 0,
+          y: 0,
+          image: imageObj,
+          width: stage.width(),
+          height: stage.height(),
+        });
+        layer.add(image);
+      };
+    };
+
+    stage.add(layer);
+    socket.onclose = function (event) {
+      if (event.wasClean) {
+        console.log(
+          `[close] Connection closed cleanly, code=${event.code} reason=${event.reason}`
+        );
+      } else {
+        console.log("[close] Connection died");
+      }
+    };
+    socket.onerror = function (error) {
+      console.log(`[error]`);
+    };
+  </script>
+</html>

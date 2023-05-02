@@ -8,8 +8,8 @@ import numpy as np
 
 
 tracker = cv2.TrackerKCF_create()
-video = cv2.VideoCapture('video.mp4')
-# video = cv2.VideoCapture(0)
+# video = cv2.VideoCapture('video.mp4')
+video = cv2.VideoCapture(0)
 # show output from camera
 if not video.isOpened():
     print("INFO : Cannot open camera")
